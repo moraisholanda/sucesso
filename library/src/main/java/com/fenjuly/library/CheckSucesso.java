@@ -7,20 +7,22 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.Parcelable;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.View;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
-/**
- * Created by liurongchan with love on 15/8/11.
- */
-public class ArrowDownloadButton extends View {
 
-    private static final int BLUE_ONE = Color.rgb(46, 164, 242);
-    private static final int WHILE = Color.rgb(255, 255, 255);
+public class CheckSucesso extends View {
+
+    private static final int GREEN = Color.rgb(82, 160, 121);
+    private static final int WHITE = Color.rgb(255, 255, 255);
     private static final float RADIUS = 180;
     private static final int TRI_POINT_NUMBER = 17;
     private static final float MAX_WAVE_HEIGHT = 10;
@@ -48,8 +50,8 @@ public class ArrowDownloadButton extends View {
     private static final float HOOK_STEP_Y = 15;
     private static final float HOOK_COUNT = 4;
     private static final float LITTLE_STEP = 8;
-    private static final int DURATION = 20;
-    private static final int COMPLETE_DURATION = 20;
+    private static final int DURATION = 5;
+    private static final int COMPLETE_DURATION = 10;
 
     /**
      * start instance
@@ -94,11 +96,12 @@ public class ArrowDownloadButton extends View {
     private static final String HOOK_COUNT_I = "hook_count";
     private static final String LENGTH_X_I = "length_x";
     private static final String LENGTH_Y_I = "length_y";
-
-
+    private final Handler mHandler = new Handler();
     private float x = 550;
     private float y = 550;
     private float radius = RADIUS;
+    float lengthX = 3 * radius / 4;
+    float lengthY = 3 * radius / 4;
     private float maxWaveHeight = MAX_WAVE_HEIGHT;
     private float minWaveHeight = MIN_WAVE_HEIGHT;
     private float textY = TEXT_Y;
@@ -118,29 +121,19 @@ public class ArrowDownloadButton extends View {
     private float arrowWidth = ARROW_WIDTH;
     private float triWidth = TRI_WIDTH;
     private float loadingWidth = LOADING_WIDTH;
-
-    private Paint arrowPaint;
-    private Paint arcPaint;
+    private Paint checkedPaint;
+    private Paint circuloPaint;
     private Paint smallPaint;
-    private Paint triPaint;
     private Paint loadingPaint;
-    private Paint textPaint;
-
-    private Path arrowPath;
-    private Path triPath;
-    private Path textPath;
-
+    private Path checkedPath;
     private RectF oval;
-
     private Point a;
     private Point b;
     private Point c;
     private Point d;
     private Point e;
     private Point jumpPoint;
-
     private List<Point> triPoints = new ArrayList<>();
-
     private boolean isFirst = true;
     private boolean isAnimating = false;
     private boolean bezier = false;
@@ -153,11 +146,20 @@ public class ArrowDownloadButton extends View {
     private float waveHeight = MIN_WAVE_HEIGHT;
     private float progress = 0;
     private int hookCount = 0;
-    float lengthX = 3 * radius / 4;
-    float lengthY = 3 * radius / 4;
+    private ListenerAnimacao listenerAnimacao;
 
-    public float getProgress() {
-        return progress;
+
+    public CheckSucesso(Context context) {
+        this(context, null);
+    }
+
+    public CheckSucesso(Context context, AttributeSet attrs) {
+        this(context, attrs, 0);
+    }
+
+    public CheckSucesso(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init();
     }
 
     public void setProgress(float progress) {
@@ -173,17 +175,8 @@ public class ArrowDownloadButton extends View {
         }
     }
 
-    public ArrowDownloadButton(Context context) {
-        this(context, null);
-    }
-
-    public ArrowDownloadButton(Context context, AttributeSet attrs) {
-        this(context, attrs, 0);
-    }
-
-    public ArrowDownloadButton(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        init();
+    public void setListenerAnimacao(ListenerAnimacao listenerAnimacao) {
+        this.listenerAnimacao = listenerAnimacao;
     }
 
     @Override
@@ -218,11 +211,13 @@ public class ArrowDownloadButton extends View {
             init();
             isFirst = false;
         }
-        canvas.drawCircle(x, y, radius, arcPaint);
-        drawArrow(canvas);
+        canvas.drawCircle(x, y, radius, circuloPaint);
+        iniciaDesenho(canvas);
+
         if (isAnimating) {
             animating();
         }
+
         if (isLoading) {
             loading(canvas);
         }
@@ -232,6 +227,7 @@ public class ArrowDownloadButton extends View {
     }
 
     private void init() {
+
         float temp = getHeight() > getWidth() ? getWidth() / 2 : getHeight() / 2;
         radius = temp - temp * OFFSET / RADIUS - temp * ELASTICITY_STEP / RADIUS - 6;
         x = getPaddingLeft() + getWidth() / 2;
@@ -258,9 +254,7 @@ public class ArrowDownloadButton extends View {
         lengthX = 3 * radius / 4;
         lengthY = 3 * radius / 4;
 
-        arrowPath = new Path();
-        triPath = new Path();
-        textPath = new Path();
+        checkedPath = new Path();
         oval = new RectF();
         oval.left = x - radius;
         oval.top = y - radius;
@@ -277,6 +271,19 @@ public class ArrowDownloadButton extends View {
     public void startAnimating() {
         isAnimating = true;
         invalidate();
+        if ((count % 2) == 0) {
+            Timer timer = new Timer();
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    progress = progress + 1;
+                    setProgress(progress);
+                }
+            }, 800, 10);
+        } else {
+            reset();
+        }
+        count++;
     }
 
     /**
@@ -310,36 +317,6 @@ public class ArrowDownloadButton extends View {
      */
     public void animating() {
         if (count < 19) {
-            length = length * 3 / 4;
-            a.y = y + length;
-            b.y = y - length;
-
-            if (((count + 1) % 3) == 0 && count < 9) {
-                e.y = e.y + step;
-                c.y = c.y + step;
-                d.y = d.y + step;
-            }
-            if (count > 8 && count < 12) {
-                jumpPoint.x = x;
-                jumpPoint.y = y - jumpStep * (count - 8);
-                c.x = c.x - ropeStepX;
-                c.y = c.y - ropeHeadStepY;
-                d.x = d.x + ropeStepX;
-                d.y = d.y - ropeHeadStepY;
-                e.y = e.y - ropeStepY;
-            }
-            if (count > 11) {
-                bezier = true;
-                if (count == 12) {
-                    jumpPoint.y = jumpPoint.y - jumpStep * 2;
-                } else {
-                    jumpPoint.y = jumpPoint.y + downStep;
-                    if (count < 16) {
-                        int time1 = 15 - count;
-                        e.y = y + time1 * elasticityStep;
-                    }
-                }
-            }
             count++;
             postInvalidateDelayed(DURATION);
         } else {
@@ -360,28 +337,10 @@ public class ArrowDownloadButton extends View {
      * @param canvas Target Canvas
      */
     private void loading(Canvas canvas) {
-        Point currentPoint = triPoints.get(0);
-        Point nextPoint;
-        for (int i = 0; i < TRI_POINT_NUMBER; i++) {
-            Point p = triPoints.get(i);
-            p.x = (x - 3 * radius / 4) + triStep * i;
-            p.y = y + calculateTri(TIME_STEP * i, currentTime);
-        }
-        for (int i = 1; i < TRI_POINT_NUMBER; i++) {
-            nextPoint = triPoints.get(i);
-            triPath.reset();
-            triPath.moveTo(currentPoint.x, currentPoint.y);
-            triPath.lineTo(nextPoint.x, nextPoint.y);
-            canvas.drawCircle(nextPoint.x, nextPoint.y, smallRadius, smallPaint);
-            canvas.drawPath(triPath, triPaint);
-            currentPoint = nextPoint;
-        }
-        textPath.moveTo(x - textSize, y + textY);
-        textPath.lineTo(x + textSize, y + textY);
-        canvas.drawTextOnPath((int) progress + "%", textPath, 0, 0, textPaint);
-        currentTime = (int) (currentTime + TIME_STEP);
+        desenhaCheckInicial(canvas, Color.GREEN);
+     //   currentTime = (int) (currentTime + TIME_STEP);
         float sweepAngle = (progress / PROGRESS * ANGLE);
-        canvas.drawArc(oval, 270, 0 - sweepAngle, false, loadingPaint);
+        canvas.drawArc(oval,315, 0 - sweepAngle, false, loadingPaint);
         postInvalidateDelayed(DURATION);
     }
 
@@ -392,52 +351,80 @@ public class ArrowDownloadButton extends View {
      *
      * @param canvas Target Canvas
      */
-    protected void drawArrow(Canvas canvas) {
-        if (jumpPoint.x != -1) {
-            canvas.drawCircle(jumpPoint.x, jumpPoint.y, smallRadius, smallPaint);
-        }
-        if (bezier) {
-            arrowPath.reset();
-            arrowPath.moveTo(c.x, c.y);
-            arrowPath.quadTo(e.x, e.y, d.x, d.y);
-            canvas.drawPath(arrowPath, arrowPaint);
-        }  else if (isLoading) {
-        } else if (isCompleted) {
-        }  else if (isEnd) {
-            canvas.drawCircle(x, y, radius, loadingPaint);
-            drawArrowOrHook(canvas);
+    protected void iniciaDesenho(Canvas canvas) {
+
+        if (isEnd) {
+            // canvas.drawCircle(x, y, radius, loadingPaint);
+            desenhaCheck(canvas, Color.WHITE);
         } else {
-            arrowPath.reset();
-            arrowPath.moveTo(a.x, a.y);
-            arrowPath.lineTo(b.x, b.y);
-            canvas.drawPath(arrowPath, arrowPaint);
-
-            canvas.drawCircle(a.x, a.y, smallRadius, smallPaint);
-            canvas.drawCircle(b.x, b.y, smallRadius, smallPaint);
-
-            drawArrowOrHook(canvas);
-
+            checkedPath.reset();
         }
     }
 
-    /**
-     * draw arrow or hook
-     *
-     * @param canvas Target Canvas
-     */
-    private void drawArrowOrHook(Canvas canvas) {
-        arrowPath.reset();
-        arrowPath.moveTo(e.x, e.y);
-        arrowPath.lineTo(c.x, c.y);
-        canvas.drawPath(arrowPath, arrowPaint);
-        arrowPath.reset();
-        arrowPath.moveTo(e.x, e.y);
-        arrowPath.lineTo(d.x, d.y);
-        canvas.drawPath(arrowPath, arrowPaint);
+    private void handlerNotificacaoListener() {
+        int segundos = 1;
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Log.e("Handlers", "Calls");
+                notificaListenerFim();
+            }
+        }, segundos * 1000);
+    }
 
+    private void notificaListenerFim() {
+        if (listenerAnimacao != null) {
+            listenerAnimacao.finish();
+        }
+    }
+
+
+    private void desenhaCirculoFinal() {
+        circuloPaint = new Paint();
+        circuloPaint.setAntiAlias(true);
+        circuloPaint.setStyle(Paint.Style.FILL);
+        circuloPaint.setStrokeWidth(arcWidth);
+        circuloPaint.setColor(GREEN);
+    }
+
+    private void desenhaCheck(Canvas canvas, int color) {
+        // desenha linha lado esquerdo
+        //  checkedPath.reset();
+        checkedPaint.setColor(color);
+        checkedPath.moveTo(e.x, e.y);
+        checkedPath.lineTo(c.x, c.y);
+        canvas.drawPath(checkedPath, checkedPaint);
+        // desenha linha lado direito
+        checkedPath.reset();
+        checkedPath.moveTo(e.x, e.y);
+        checkedPath.lineTo(d.x, d.y);
+        canvas.drawPath(checkedPath, checkedPaint);
+        // desenha ângulo que une as linhas
+        smallPaint.setColor(color);
         canvas.drawCircle(c.x, c.y, smallRadius, smallPaint);
         canvas.drawCircle(d.x, d.y, smallRadius, smallPaint);
         canvas.drawCircle(e.x, e.y, smallRadius, smallPaint);
+    }
+
+    private void desenhaCheckInicial(Canvas canvas, int color) {
+        // desenha linha lado esquerdo
+        canvas.drawLine((float) 180.0, (float) 225.34445,(float) 136.61063, (float) 180.0,checkedPaint);
+       checkedPaint.setColor(GREEN);
+
+        checkedPath.moveTo((float) 180.0, (float) 225.34445);
+        checkedPath.lineTo((float) 136.61063, (float) 180.0);
+
+        canvas.drawPath(checkedPath, checkedPaint);
+        // desenha linha lado direito
+        checkedPath.reset();
+        checkedPath.moveTo((float) 180.0, (float) 225.34445);
+        checkedPath.lineTo((float) 244.59445, (float) 134.65555);
+        canvas.drawPath(checkedPath, checkedPaint);
+        // desenha ângulo que une as linhas
+        smallPaint.setColor(GREEN);
+        canvas.drawCircle((float) 136.61063, (float) 180.0, smallRadius, smallPaint);
+        canvas.drawCircle((float) 244.59445, (float) 134.65555, smallRadius, smallPaint);
+        canvas.drawCircle((float) 180.0, (float) 225.34445, smallRadius, smallPaint);
     }
 
     /**
@@ -464,47 +451,37 @@ public class ArrowDownloadButton extends View {
             d.y = y - hookStepY * (hookCount + 1);
             hookCount++;
         }
-        drawArrowOrHook(canvas);
+        desenhaCirculoFinal();
         postInvalidateDelayed(COMPLETE_DURATION);
-
+        handlerNotificacaoListener();
     }
 
-    protected void initializePaints() {
-        arcPaint = new Paint();
-        arcPaint.setAntiAlias(true);
-        arcPaint.setStyle(Paint.Style.STROKE);
-        arcPaint.setStrokeWidth(arcWidth);
-        arcPaint.setColor(BLUE_ONE);
 
-        arrowPaint = new Paint();
-        arrowPaint.setAntiAlias(true);
-        arrowPaint.setStyle(Paint.Style.STROKE);
-        arrowPaint.setStrokeWidth(arrowWidth);
-        arrowPaint.setColor(WHILE);
+    protected void initializePaints() {
+        circuloPaint = new Paint();
+        circuloPaint.setAntiAlias(true);
+        circuloPaint.setStyle(Paint.Style.FILL);
+        circuloPaint.setStrokeWidth(arcWidth);
+        circuloPaint.setColor(WHITE);
+
+        checkedPaint = new Paint();
+        checkedPaint.setAntiAlias(true);
+        checkedPaint.setStyle(Paint.Style.STROKE);
+        checkedPaint.setStrokeWidth(arrowWidth);
+        checkedPaint.setColor(GREEN);
 
         smallPaint = new Paint();
         smallPaint.setAntiAlias(true);
         smallPaint.setStyle(Paint.Style.FILL);
-        smallPaint.setColor(WHILE);
-
-        triPaint = new Paint();
-        triPaint.setAntiAlias(true);
-        triPaint.setStyle(Paint.Style.STROKE);
-        triPaint.setStrokeWidth(triWidth);
-        triPaint.setColor(WHILE);
+        smallPaint.setColor(GREEN);
 
         loadingPaint = new Paint();
-        loadingPaint.setAntiAlias(true);
+        loadingPaint.setAntiAlias(false);
         loadingPaint.setStyle(Paint.Style.STROKE);
         loadingPaint.setStrokeWidth(loadingWidth);
-        loadingPaint.setColor(WHILE);
+        loadingPaint.setColor(GREEN);
 
-        textPaint = new Paint();
-        textPaint.setAntiAlias(true);
-        textPaint.setStyle(Paint.Style.FILL);
-        textPaint.setStrokeWidth(1);
-        textPaint.setColor(WHILE);
-        textPaint.setTextSize(textSize);
+
     }
 
     protected void initializePoints() {
@@ -522,6 +499,7 @@ public class ArrowDownloadButton extends View {
             triPoints.add(point);
         }
     }
+
 
     /**
      * calculate the wave
